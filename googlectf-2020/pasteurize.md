@@ -128,7 +128,7 @@ to url encode the + so it doesn't end up as a space.
 Found. Redirecting to /a536d492-4d6f-4d42-b1b5-5a28216e2cd9  
 ```
 
-Now lets visit our new note in the browser and send it to the admin.  If everything worked properly we should get the following request sent to our server:
+Now lets visit our new note in the browser and share it to the admin.  If everything worked properly we should get the following request sent to our server:
 
 ```http
 22:55:53: GET /c2VjcmV0PUNURntFeHByZXNzX3QwX1RyMHVibDNzfQ==

