@@ -194,7 +194,8 @@ executed when inserted via `innerHTML`.
 ## Multiple callbacks
 
 After a *long* chain of trial and error, we came to a solution that allowed us to chain multiple callbacks.  An `<iframe>` with a `srcdoc` attribute
-allowed us to bypass the `innerHTML` `<script>` tag restriction that prevents execution, allowing for including multiple `/theme?cb=...` scripts.
+allowed us to bypass the `innerHTML` `<script>` tag restriction that prevents execution, allowing for including multiple `/theme?cb=...` scripts.  This
+also works because scripts loaded inside `srcdoc` are able to access the outer window contents via `window.top`.
 
 ```json
 {
