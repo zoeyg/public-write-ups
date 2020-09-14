@@ -188,8 +188,9 @@ unaltered string.  This should allow us to set arbitrary HTML with the following
 ```
 
 Setting `window.name` to the above should result in removing most of the page content and replacing it with the payload, so we now have arbitrary HTML injection.
-Unfortunately, due to the content security policy, we can't do the traditional `<img src=x onerror=alert()>` or use a `<script>` tag, because those aren't
-executed when inserted via `innerHTML`.
+Unfortunately, due to the content security policy, we can't do the traditional `<img src=x onerror=alert()>`, because of the content security policy, or use a `<script>`
+tag, because those aren't executed when inserted via `innerHTML`.  However, if we could do multiple requests to `/theme` and thus multiple callback executions, it would
+open up a lot of possibilities.
 
 ## Multiple callbacks
 
@@ -251,8 +252,8 @@ in callback executions.  The first grabs the `innerText` of the whole page, and 
 `innerText` of the `concat` form which should be our URL plus the text of the page, and then sets the browser location to make the request.  We
 should then be able to grab the contents of the page by looking at the request sent to our local http server.  Testing it on our own browser, we find that it works, though it 
 sometimes fails due to the response times from the server and the script loading order.  The failures might be able to be mitigated by
-adding in some extra script or image tags, maxing out the concurrent requests of the browser, making the load order more predictable for the scripts and callbacks we
-care about.
+adding in some extra script or image tags, maxing out the concurrent requests of the browser, and hopefully making the load order more predictable for the scripts and
+callbacks we care about.
 
 ### Getting The Note GUID
 
