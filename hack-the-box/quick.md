@@ -71,7 +71,7 @@ There's text that states _We are migrating our portal with latest TLS and HTTP s
 #### Connecting
 
 We know from our earlier nmap scan that port 443 isn't open. Given that the challenge is named quick, and the little
-snippet talks about the latest TLC and HTTP support, perhaps it's referring to http/3, which uses [QUIC](https://en.wikipedia.org/wiki/QUIC).  It uses
+snippet talks about the latest TLS and HTTP support, perhaps it's referring to http/3, which uses [QUIC](https://en.wikipedia.org/wiki/QUIC).  It uses
 UDP so lets use nmap to check.
 
 ```shell-session
