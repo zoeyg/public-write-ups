@@ -32,7 +32,7 @@ Nmap done: 1 IP address (1 host up) scanned in 64.78 seconds
 
 ```
 
-This gives use three hostnames to work with on the web server.
+This gives use three hostnames to work with on the web server, perhaps there are some virtual hosts.
 
 ## https
 
@@ -988,14 +988,6 @@ Welcome to Ubuntu 20.04 LTS (GNU/Linux 5.4.0-26-generic x86_64)
   IPv4 address for br-8ec6dcae5ba1: 172.30.0.1
   IPv4 address for docker0:         172.17.0.1
   IPv4 address for eth0:            10.10.10.189
-
-
-The programs included with the Ubuntu system are free software;
-the exact distribution terms for each program are described in the
-individual files in /usr/share/doc/*/copyright.
-
-Ubuntu comes with ABSOLUTELY NO WARRANTY, to the extent permitted by
-applicable law.
 
 
 The programs included with the Ubuntu system are free software;
