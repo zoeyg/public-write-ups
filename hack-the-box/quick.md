@@ -74,7 +74,7 @@ We know from our earlier nmap scan that port 443 isn't open. Given that the box 
 snippet talks about the latest TLS and HTTP support, perhaps it's referring to http/3, which uses [QUIC](https://en.wikipedia.org/wiki/QUIC).  It uses
 UDP so lets use nmap to check.
 
-```shell-session
+```shell
 ╭─zoey@nomadic ~/htb/travel ‹master*›
 ╰─$ sudo nmap -sU -v -p 443 quick.htb
 Starting Nmap 7.80 ( https://nmap.org ) at 2020-05-23 23:05 PDT
@@ -101,7 +101,7 @@ Success.  Now we need a way to access it. Firefox nightly and chrome don't seem 
 Let's try curl. A bit of searching shows we'd need to compile the support into curl, however there's a [docker image](https://hub.docker.com/r/ymuski/curl-http3) available where someone's
 already done it for us. Lets give it a go.
 
-```shell-session
+```shell
 ╭─zoey@parrot-virtual ~/dev/public-write-ups ‹master› 
 ╰─$ docker run -it --rm ymuski/curl-http3 curl -ILv https://10.10.10.186 --http3
 *   Trying 10.10.10.186:443...
@@ -287,7 +287,7 @@ Running `linpeas.sh` we notice some interesting code in `/var/www/printer`.
 
 Trying to figure out how to access this printer site, let's check out the apache config
 
-```shell-session
+```shell
 sam@quick:/etc/apache2/sites-enabled$ ls -la
 total 8
 drwxr-xr-x 2 root root 4096 Mar 20 02:16 .
@@ -442,7 +442,7 @@ fclose($fn);
 
 Then let's call it with the rockyou list:
 
-```shell-session
+```shell
 ╭─zoey@nomadic ~/htb/quick ‹master*›
 ╰─$ php crack-srvadm-pw.php /usr/share/wordlists/rockyou.txt
 Tries 100000, sagar
@@ -502,7 +502,7 @@ If everything went well we should be able to ssh into the `srvadm` user.
 
 The usual enum isn't showing much, and we've already seen most of what's available from the other user account. Let's find stuff that `srvadm` has access to that `sam` might not
 
-```shell-session
+```shell
 srvadm@quick:~$ find / -user srvadm 2>/dev/null | grep -v /proc | grep -v /sys
 /home/srvadm
 /home/srvadm/.cache

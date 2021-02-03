@@ -15,7 +15,7 @@ web server running through gunicorn, and coturn.
 
 ### Web Server
 
-The web server servers a single page with some javascript.  It sets up webRTC(use Firefox) and uses it to send chat messages back and
+The web server serves a single page with some javascript.  It sets up webRTC(use Firefox) and uses it to send chat messages back and
 forth with a peer.  If you access the page without a session id in the location hash, it will create one and give you a link to
 open up a connection on another page.  Opening that link you're able to send messages between the new page and the one that created
 the session.
@@ -126,7 +126,7 @@ def build_allocate_request():
   return header + attributes
 ```
 
-Then we need some code to send and receive the request, as well as parse the response.  Wireshark and the RFCs coming in handy again while 
+Then we need some code to send and receive the request, as well as parse the response.  Wireshark and the RFCs came in handy again while 
 trying to troubleshoot.  The attributes have a pattern of type, length, and then value.  The allocation request basically requests a TCP
 connection, and specifies how long it should live for.
 
@@ -224,7 +224,7 @@ ip 172.17.0.3
 value b'00019ed08d03a441'
 attibute type XOR-MAPPED-ADDRESS
 port 23550
-ip 136.24.87.102
+ip 136.24.86.99
 value b'00017aeca90af324'
 attribute type LIFETIME
 value 3600
@@ -559,7 +559,7 @@ ip 172.17.0.3
 value b'00019eb58d03a441'
 attibute type XOR-MAPPED-ADDRESS
 port 44314
-ip 136.24.87.102
+ip 136.24.86.99
 value b'00018c08a90af324'
 attribute type LIFETIME
 value 3600
