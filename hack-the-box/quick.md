@@ -2,7 +2,9 @@
 
 ## User
 
-### nmap
+### Enumeration
+
+#### nmap
 
 ```
 PORT     STATE SERVICE VERSION
@@ -19,9 +21,9 @@ PORT     STATE SERVICE VERSION
 Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
 ```
 
-### webserver - quick.htb:9001
+#### webserver - quick.htb:9001
 
-clients
+We find a list of clients
 
 ```
 Tim (Qconsulting Pvt Ltd)
@@ -66,9 +68,9 @@ there's nothing that allows that yet. Perhaps we can do it later on.
 
 There's text that states _We are migrating our portal with latest TLS and HTTP support. To read more about our services, please navigate to our portal_, and a link to https://portal.quick.htb.
 
-### portal.quick.htb
+#### portal.quick.htb
 
-#### Connecting
+##### Connecting
 
 We know from our earlier nmap scan that port 443 isn't open. Given that the box is named quick, and the little
 snippet talks about the latest TLS and HTTP support, perhaps it's referring to http/3, which uses [QUIC](https://en.wikipedia.org/wiki/QUIC).  It uses
@@ -134,7 +136,7 @@ alt-svc: h3-23=":443"; ma=86400
 * Connection #0 to host 10.10.10.186 left intact
 ```
 
-#### Enumeration
+##### Enumeration
 
 The index page has a few links:
 
@@ -155,7 +157,7 @@ The index page has a few links:
 
 Navigating the site via curl, on the `index.php?view=docs` page we eventually find a link to a file, `Connectivity.pdf`.
 
-#### Connectivity.pdf
+##### Connectivity.pdf
 
 This pdf has some instructions with default credentials
 

