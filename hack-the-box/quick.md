@@ -178,7 +178,7 @@ at [http://quick.htb:9001/home.php](http://quick.htb:9001/home.php)
 
 #### ticket.php
 
-We can make a ticket with an idea that we can later search. The ticket ID is TKT-####
+We can make a ticket with an ID that we can later search. The ticket ID is TKT-####
 
 #### search.php
 

@@ -580,7 +580,7 @@ www-data@blog:/var/www/html/wp-content/themes/twentytwenty/logs$ whoami
 www-data
 ```
 
-## Persistence
+### Persistence
 
 We eventually learn there's likely a script running to remove the files in the `/logs` directory and it kills our web shell. Let
 setup some persistence by putting a web shell in a different directory. Just use curl to download a shell
