@@ -148,11 +148,11 @@ When we send to the admin we get two hits on our local server:
         X-Forwarded-For: 2600:1900:2001:b:400::1
 ```
 
-It would seem that the headless chrome instance did execute the code, and we got the request for the `/b64/` route, but `document.cookie` was empty.  What gives?  Visiting the exploit url in our own browser and looking in dev tools, even though we've logged in as `guest` there's no cookie.
+It would seem that the headless chrome instance did execute the code, and we got the request for the `/b64/` route, but `document.cookie` was empty.  What gives?  Visiting `/sandbox.html` in our own browser and looking in dev tools, even though we've logged in as `guest` there's no cookie.
 
 ## Adjusting
 
-Lets revisit the server code that sets the cookie
+Lets revisit the server code that sets the cookie:
 
 ```js
   return res.cookie('token', `dice{${process.env.FLAG}}`, {
@@ -214,7 +214,7 @@ The final payload looks like the following:
 </script>
 ```
 
-We send the admin a link to this file, which is hosted via ngrok on our local server.  If everything does to plan, we should get a hit on our local server, and on my [tools server](https://github.com/zoeyg/sec/blob/master/tools/simple-http-server.js) the `/b64/:contents` route decodes contents
+We send the admin a link to this file, which is hosted via ngrok on our local server.  If everything goes to plan, we should get a hit on our local server, and on my [tools server](https://github.com/zoeyg/sec/blob/master/tools/simple-http-server.js) the `/b64/:contents` route decodes contents
 and logs it to stdout:
 
 ```

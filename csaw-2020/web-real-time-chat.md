@@ -275,7 +275,7 @@ print('\n\n')
 
 If done properly, we should get a success response with a connection id that we need for the following request.  Lets see what happens.
 
-```
+```python
 generated txn id b'27706f2772e2fc069fb41a04'
 Raw Connect Request Response b'\x01\x1a\x00\x1c!\x12\xa4B\'po\'r\xe2\xfc\x06\x9f\xb4\x1a\x04\x00\t\x00\x10\x00\x00\x04\x03Forbidden IP\x80"\x00\x04None'
 Message Type b'\x01\x1a'
@@ -296,7 +296,7 @@ Traceback (most recent call last):
 TypeError: can't concat NoneType to bytes
 ```
 
-Uh-oh, looking at the raw request output, and checking the packet in wireshark, we see that the IP address is forbidden, and we didn't get our
+Uh-oh, looking at the raw request output, and checking the packet in wireshark, we see that `127.0.0.1` is forbidden, and we didn't get our
 connection id that we needed.  Looks like we'll need to try something else.
 
 #### Connect Request (Second Attempt)
@@ -404,7 +404,7 @@ while 1:
 
 Lets run it and see how things go.
 
-```
+```python
 generated txn id b'94f5b75dd0ef28dde4622cf8'
 Raw ConnectionBind Request Response b'\x01\x0b\x00\x08!\x12\xa4B\x94\xf5\xb7]\xd0\xef(\xdd\xe4b,\xf8\x80"\x00\x04None'
 Message Type b'\x01\x0b'
@@ -418,7 +418,7 @@ KEYS *
 *0
 ```
 
-We type `KEYS *` and get a response, success! We now have a connection that behaves as if we have used telnet to connect a redis server.  
+We type `KEYS *` and get a response, success! We now have a connection that behaves as if we have used netcat to connect to a redis server.  
 Eventually the connection gets reset, and this may either be due to a restart mechanism on the server, or a lack of refresh requests on
 the control socket.  Either way, it stays open long enough we can pretty much get done whatever we need to.  One thing of note, when closing
 the control socket, it seemed the data socket connection also was reset.
